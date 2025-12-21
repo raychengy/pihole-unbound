@@ -1,0 +1,21 @@
+# Local environment variables. Contains sensitive information.
+.env
+
+# Pi-hole runtime data, databases, and configuration.
+# This directory is managed by the Pi-hole container.
+etc-pihole/
+
+# Custom dnsmasq configuration.
+# This is volume mounted, but often contains runtime generated files or personal configs.
+etc-dnsmasq.d/
+
+# Downloaded Unbound root hints file.
+unbound/root.hints
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+._*
+
+# Docker files
+.dockerignore

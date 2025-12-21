@@ -1,0 +1,83 @@
+networks:
+  internal_bridge:
+    internal: true
+  pihole-lan:
+    driver: macvlan
+    driver_opts:
+      parent: ${PIHOLE_LAN_PARENT:-eth0} # Set in .env file. CHECK THIS: Might be ovs_eth0 on some UGREEN setups
+    ipam:
+      config:
+        - subnet: ${PIHOLE_LAN_SUBNET:-192.168.1.0/24} # Set in .env file
+          gateway: ${PIHOLE_LAN_GATEWAY:-192.168.1.1} # Set in .env file
+          ip_range: ${PIHOLE_IP:-192.168.1.200}/32 # Set in .env file
+services:
+  unbound:
+    container_name: unbound
+    image: mvance/unbound:latest
+    restart: unless-stopped
+    hostname: unbound
+    networks:
+      internal_bridge: # Only needs to talk to Pi-hole internally
+      default:
+    volumes:
+      - unbound_data:/opt/unbound/etc/unbound/
+
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    ports:
+      # DNS Ports
+      - "53:53/tcp"
+      - "53:53/udp"
+      # Uncomment the line below if you are using Pi-hole as your DHCP server
+      #- "67:67/udp"
+      # Uncomment the line below if you are using Pi-hole as your NTP server
+      #- "123:123/udp"
+    environment:
+      # Set the appropriate timezone for your location (https://en.wikipedia.org/wiki/List_of_tz_database_time_zones), e.g:
+      TZ: ${TZ}
+      # Set a password to access the web interface. Not setting one will result in a random password being assigned
+      FTLCONF_webserver_api_password: ${WEBPASSWORD}
+      # Set the upstream DNS server(s) that Pi-hole will use. This can be a comma-separated list of servers
+      FTLCONF_dns_upstreams: "unbound#53"
+      FTLCONF_dns_dnssec: "true"
+      # If using Docker's default `bridge` network setting the dns listening mode should be set to 'ALL'
+      FTLCONF_dns_listeningMode: "ALL"
+    # Volumes store your data between container upgrades
+    volumes:
+      # For persisting Pi-hole's databases and common configuration file
+      - "./etc-pihole:/etc/pihole"
+      # Uncomment the below if you have custom dnsmasq config files that you want to persist. Not needed for most starting fresh with Pi-hole v6. If you're upgrading from v5 you and have used this directory before, you should keep it enabled for the first v6 container start to allow for a complete migration. It can be removed afterwards. Needs environment variable FTLCONF_misc_etc_dnsmasq_d: 'true'
+      - "./etc-dnsmasq.d:/etc/dnsmasq.d"
+    cap_add:
+      # See https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
+      # Required if you are using Pi-hole as your DHCP server, else not needed
+      - NET_ADMIN
+      # Required if you are using Pi-hole as your NTP client to be able to set the host's system time
+      - SYS_TIME
+      # Optional, if Pi-hole should get some more processing time
+      - SYS_NICE
+    depends_on:
+      - unbound
+    restart: unless-stopped
+    networks:
+      pihole-lan:
+        ipv4_address: ${PIHOLE_IP:-192.168.1.200} # Set in .env file
+      internal_bridge:
+  cloudflare-tunnel:
+    image: cloudflare/cloudflared:2025.1.1
+    restart: unless-stopped
+    # The command starts the tunnel using a token from the .env file.
+    # This token links the container to a specific tunnel in your Cloudflare account.
+    # In the Cloudflare Zero Trust dashboard, the tunnel's private network service
+    # should be configured to point to http://pihole:80
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    networks:
+      internal_bridge: # Can talk to pihole:80 freely
+      default:
+    depends_on:
+      # Ensures the tunnel only starts after the pihole service is started.
+      pihole:
+        condition: service_started
+volumes:
+  unbound_data:
