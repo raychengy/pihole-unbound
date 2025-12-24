@@ -15,12 +15,11 @@ services:
     container_name: unbound
     image: klutchell/unbound:latest
     restart: unless-stopped
-    hostname: unbound
     networks:
       internal_bridge: # Only needs to talk to Pi-hole internally
       default:
     volumes:
-      - ./unbound:/etc/unbound
+      - ./unbound:/etc/unbound/unbound.conf.d
 
   pihole:
     container_name: pihole
@@ -39,7 +38,7 @@ services:
       # Set a password to access the web interface. Not setting one will result in a random password being assigned
       FTLCONF_webserver_api_password: ${WEBPASSWORD}
       # Set the upstream DNS server(s) that Pi-hole will use. This can be a comma-separated list of servers
-      FTLCONF_dns_upstreams: "unbound#5335"
+      FTLCONF_dns_upstreams: "unbound#53"
       FTLCONF_dns_dnssec: "true"
       # If using Docker's default `bridge` network setting the dns listening mode should be set to 'ALL'
       FTLCONF_dns_listeningMode: "ALL"
