@@ -20,7 +20,7 @@ services:
       internal_bridge: # Only needs to talk to Pi-hole internally
       default:
     volumes:
-      - unbound_data:/opt/unbound/etc/unbound/
+      - unbound_data:/opt/unbound/etc/unbound/:rw
 
   pihole:
     container_name: pihole
